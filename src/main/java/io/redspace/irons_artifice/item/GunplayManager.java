@@ -1,6 +1,6 @@
 package io.redspace.irons_artifice.item;
 
-import com.geckolib.animatable.GeoItem;
+import software.bernie.geckolib.animatable.GeoItem;
 import io.redspace.irons_artifice.api.AmmoEvent;
 import io.redspace.irons_artifice.api.ComposeShotEvent;
 import io.redspace.irons_artifice.api.GunAboutToShootEvent;
@@ -94,7 +94,9 @@ public final class GunplayManager {
         //  - fire shot from fixed direction
         //  - then apply character motion
         RecoilState offset = RecoilState.current(shooter, now);
-        Vec2 rotation = direction.rotation();
+        Vec2 rotation = new Vec2(
+                (float) Math.toDegrees(Math.asin(-direction.y)),
+                (float) Math.toDegrees(Math.atan2(-direction.x, direction.z)));
         float pitch = rotation.x - offset.pitch();
         float yaw = rotation.y + offset.yaw();
         depleteMagazine(shooter, profile, stack, magazine, ammoToConsume);

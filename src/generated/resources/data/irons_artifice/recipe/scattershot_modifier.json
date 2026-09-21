@@ -1,17 +1,23 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "#": "minecraft:string",
-    "B": "irons_artifice:bullet",
-    "P": "irons_artifice:blackpowder"
-  },
-  "pattern": [
-    " BB",
-    "#PB",
-    " # "
-  ],
-  "result": {
-    "id": "irons_artifice:scattershot_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "#":  {
+                          "item":  "minecraft:string"
+                      },
+                "B":  {
+                          "item":  "irons_artifice:bullet"
+                      },
+                "P":  {
+                          "item":  "irons_artifice:blackpowder"
+                      }
+            },
+    "pattern":  [
+                    " BB",
+                    "#PB",
+                    " # "
+                ],
+    "result":  {
+                   "id":  "irons_artifice:scattershot_modifier"
+               }
 }

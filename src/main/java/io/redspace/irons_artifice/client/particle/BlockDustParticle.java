@@ -2,13 +2,13 @@ package io.redspace.irons_artifice.client.particle;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.SingleQuadParticle;
+import net.minecraft.client.particle.TextureSheetParticle;
+import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.client.renderer.state.level.QuadParticleRenderState;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.util.Mth;
@@ -20,12 +20,13 @@ import net.neoforged.neoforge.common.Tags;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-public class BlockDustParticle extends SingleQuadParticle {
+public class BlockDustParticle extends TextureSheetParticle {
     public BlockDustParticle(ClientLevel level, double x, double y, double z,
                              double xa, double ya, double za,
                              float r, float g, float b,
                              SpriteSet sprites) {
-        super(level, x, y, z, xa, ya, za, sprites.first());
+        super(level, x, y, z, xa, ya, za);
+        setSprite(sprites.get(0, 1));
         this.setParticleSpeed(xa, ya, za);
         this.setColor(r, g, b);
         this.sprites = sprites;
@@ -47,9 +48,9 @@ public class BlockDustParticle extends SingleQuadParticle {
     }
 
     @Override
-    public void extract(QuadParticleRenderState particleTypeRenderState, Camera camera, float partialTickTime) {
+    public void render(VertexConsumer consumer, Camera camera, float partialTickTime) {
         updateAlpha(partialTickTime);
-        super.extract(particleTypeRenderState, camera, partialTickTime);
+        super.render(consumer, camera, partialTickTime);
     }
 
     private void updateAlpha(float partialTickTime) {
@@ -57,8 +58,8 @@ public class BlockDustParticle extends SingleQuadParticle {
     }
 
     @Override
-    protected @NonNull Layer getLayer() {
-        return Layer.TRANSLUCENT;
+    public @NonNull ParticleRenderType getRenderType() {
+        return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
     }
 
     public static class Provider implements ParticleProvider<BlockParticleOption> {
@@ -71,7 +72,7 @@ public class BlockDustParticle extends SingleQuadParticle {
         @Override
         public @Nullable Particle createParticle(BlockParticleOption options, ClientLevel level,
                                                  double x, double y, double z,
-                                                 double xa, double ya, double za, RandomSource random) {
+                                                 double xa, double ya, double za) {
             BlockState blockState = options.getState();
             if (!blockState.isAir() && blockState.getRenderShape() == RenderShape.INVISIBLE) {
                 return null;
@@ -84,15 +85,11 @@ public class BlockDustParticle extends SingleQuadParticle {
                     // for some reason, undyed glass's color is black. hardcode to white-blue
                     tintColor = 0xd0eae9;
                 } else {
-                    BlockTintSource tintSource = Minecraft.getInstance().getBlockColors().getTintSource(blockState, 0);
-                    if (tintSource != null) {
-                        tintColor = tintSource.color(blockState);
-                    } else {
-                        tintColor = blockState.getMapColor(level, pos).col;
-                    }
+                    tintColor = Minecraft.getInstance().getBlockColors().getColor(blockState, level, pos, 0);
+                    if (tintColor == -1) tintColor = blockState.getMapColor(level, pos).col;
                 }
 
-                float intensity = random.nextIntBetweenInclusive(5, 7) * 0.1f;
+                float intensity = level.random.nextIntBetweenInclusive(5, 7) * 0.1f;
                 float r = (tintColor >> 16 & 0xFF) / 255.0F * intensity;
                 float g = (tintColor >> 8 & 0xFF) / 255.0F * intensity;
                 float b = (tintColor & 0xFF) / 255.0F * intensity;

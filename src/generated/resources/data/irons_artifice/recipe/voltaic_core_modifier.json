@@ -1,17 +1,23 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "B": "irons_artifice:blackpowder",
-    "I": "#c:ingots/copper",
-    "R": "minecraft:lightning_rod"
-  },
-  "pattern": [
-    " R ",
-    "RIR",
-    "IBI"
-  ],
-  "result": {
-    "id": "irons_artifice:voltaic_core_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "B":  {
+                          "item":  "irons_artifice:blackpowder"
+                      },
+                "I":  {
+                          "tag":  "c:ingots/copper"
+                      },
+                "R":  {
+                          "item":  "minecraft:lightning_rod"
+                      }
+            },
+    "pattern":  [
+                    " R ",
+                    "RIR",
+                    "IBI"
+                ],
+    "result":  {
+                   "id":  "irons_artifice:voltaic_core_modifier"
+               }
 }

@@ -1,14 +1,12 @@
 package io.redspace.irons_artifice.item;
 
-import com.geckolib.animatable.GeoAnimatable;
-import com.geckolib.animatable.manager.AnimatableManager;
-import com.geckolib.animation.AnimationController;
-import com.geckolib.animation.RawAnimation;
-import com.geckolib.animation.object.PlayState;
-import com.geckolib.animation.state.AnimationTest;
-import com.geckolib.constant.dataticket.DataTicket;
-import com.geckolib.model.GeoModel;
-import com.geckolib.renderer.base.GeoRenderState;
+import software.bernie.geckolib.animatable.GeoAnimatable;
+import software.bernie.geckolib.animation.AnimatableManager;
+import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.animation.RawAnimation;
+import software.bernie.geckolib.animation.PlayState;
+import software.bernie.geckolib.animation.AnimationState;
+import software.bernie.geckolib.constant.dataticket.DataTicket;
 import io.redspace.irons_artifice.IronsArtifice;
 import io.redspace.irons_artifice.api.GunAnimations;
 import io.redspace.irons_artifice.data.HandOccupancy;
@@ -29,17 +27,16 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUtils;
+import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -49,15 +46,15 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class GunItem extends BaseGeoItem {
-    public static final DataTicket<MagazineContents> MAGAZINE_ANIMATION_TICKET = DataTicket.create(IronsArtifice.id("magazine_state").toString(), MagazineContents.class);
+    public static final DataTicket<MagazineContents> MAGAZINE_ANIMATION_TICKET = new DataTicket<>(IronsArtifice.id("magazine_state").toString(), MagazineContents.class);
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static final DataTicket<List<AnimationAdjuster>> ANIMATION_ADJUSTERS_TICKET = DataTicket.create(IronsArtifice.id("animation_adjusters").toString(), (Class) List.class);
-    public static final DataTicket<AttachmentMap> ATTACHMENTS = DataTicket.create(IronsArtifice.id("attachments").toString(), AttachmentMap.class);
-    public static final DataTicket<Double> RELOAD_PROGRESS_SECONDS_TICKET = DataTicket.create(IronsArtifice.id("reload_progress_seconds").toString(), Double.class);
-    public static final DataTicket<Float> RELOAD_PERCENT_TICKET = DataTicket.create(IronsArtifice.id("reload_percent").toString(), Float.class);
-    public static final DataTicket<Float> MUZZLE_OFFSET_TICKET = DataTicket.create(IronsArtifice.id("muzzle_offset").toString(), Float.class);
-    public static final DataTicket<HandOccupancy> HAND_OCCUPANCY_TICKET = DataTicket.create(IronsArtifice.id("hand_occupancy").toString(), HandOccupancy.class);
-    public static final DataTicket<Integer> ITEM_OWNER_ID_TICKET = DataTicket.create(IronsArtifice.id("item_owner_id").toString(), Integer.class);
+    public static final DataTicket<List<AnimationAdjuster>> ANIMATION_ADJUSTERS_TICKET = new DataTicket<>(IronsArtifice.id("animation_adjusters").toString(), (Class) List.class);
+    public static final DataTicket<AttachmentMap> ATTACHMENTS = new DataTicket<>(IronsArtifice.id("attachments").toString(), AttachmentMap.class);
+    public static final DataTicket<Double> RELOAD_PROGRESS_SECONDS_TICKET = new DataTicket<>(IronsArtifice.id("reload_progress_seconds").toString(), Double.class);
+    public static final DataTicket<Float> RELOAD_PERCENT_TICKET = new DataTicket<>(IronsArtifice.id("reload_percent").toString(), Float.class);
+    public static final DataTicket<Float> MUZZLE_OFFSET_TICKET = new DataTicket<>(IronsArtifice.id("muzzle_offset").toString(), Float.class);
+    public static final DataTicket<HandOccupancy> HAND_OCCUPANCY_TICKET = new DataTicket<>(IronsArtifice.id("hand_occupancy").toString(), HandOccupancy.class);
+    public static final DataTicket<Integer> ITEM_OWNER_ID_TICKET = new DataTicket<>(IronsArtifice.id("item_owner_id").toString(), Integer.class);
     public static final String TRIGGERED_ANIMATION_CONTROLLER = GunAnimations.CONTROLLER_ACTIONS;
     public static final String IDLE_ANIMATION_CONTROLLER = GunAnimations.CONTROLLER_IDLE;
 
@@ -67,7 +64,6 @@ public class GunItem extends BaseGeoItem {
         super(properties
                 .stacksTo(1)
                 .component(DataComponents.CONTAINER, ItemContainerContents.EMPTY)
-                .component(DataComponents.TOOLTIP_DISPLAY, TooltipDisplay.DEFAULT.withHidden(DataComponents.CONTAINER, true))
                 .component(DataComponentRegistry.MAGAZINE, new MagazineContents(gunProfile.magazineCapacity()))
         );
         this.gunProfile = gunProfile;
@@ -75,7 +71,7 @@ public class GunItem extends BaseGeoItem {
 
     public static final int SCOPE_USE_DURATION = 1200;
 
-    public static boolean hasGunSpyglass(ItemInstance stack) {
+    public static boolean hasGunSpyglass(ItemStack stack) {
         return stack.has(DataComponentRegistry.GUN_SPYGLASS);
     }
 
@@ -84,14 +80,17 @@ public class GunItem extends BaseGeoItem {
     }
 
     public static boolean isChargingBayonet(Entity entity) {
-        return entity instanceof LivingEntity living && living.isUsingItem() && living.getUseItem().has(DataComponents.KINETIC_WEAPON);
+        return entity instanceof LivingEntity living && living.isUsingItem() && living.getUseItem().has(DataComponentRegistry.BAYONET);
     }
 
     @Override
-    public @NonNull InteractionResult use(@NonNull Level level, @NonNull Player player, @NonNull InteractionHand hand) {
+    public @NonNull InteractionResultHolder<ItemStack> use(@NonNull Level level, @NonNull Player player, @NonNull InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (GunItem.isReloading(stack)) {
-            return InteractionResult.FAIL;
+            return InteractionResultHolder.fail(stack);
+        }
+        if (stack.has(DataComponentRegistry.BAYONET)) {
+            return ItemUtils.startUsingInstantly(level, player, hand);
         }
         if (!hasGunSpyglass(stack)) {
             return super.use(level, player, hand);
@@ -102,7 +101,13 @@ public class GunItem extends BaseGeoItem {
 
     @Override
     public int getUseDuration(@NonNull ItemStack stack, @NonNull LivingEntity user) {
-        return hasGunSpyglass(stack) ? SCOPE_USE_DURATION : super.getUseDuration(stack, user);
+        return hasGunSpyglass(stack) || stack.has(DataComponentRegistry.BAYONET)
+                ? SCOPE_USE_DURATION : super.getUseDuration(stack, user);
+    }
+
+    @Override
+    public UseAnim getUseAnimation(ItemStack stack) {
+        return stack.has(DataComponentRegistry.BAYONET) ? UseAnim.BOW : super.getUseAnimation(stack);
     }
 
     @Override
@@ -115,12 +120,12 @@ public class GunItem extends BaseGeoItem {
     }
 
     @Override
-    public boolean releaseUsing(@NonNull ItemStack stack, @NonNull Level level, @NonNull LivingEntity entity, int remainingTime) {
+    public void releaseUsing(@NonNull ItemStack stack, @NonNull Level level, @NonNull LivingEntity entity, int remainingTime) {
         if (hasGunSpyglass(stack)) {
             entity.playSound(SoundEvents.SPYGLASS_STOP_USING, 1.0F, 1.0F);
-            return true;
+            return;
         }
-        return super.releaseUsing(stack, level, entity, remainingTime);
+        super.releaseUsing(stack, level, entity, remainingTime);
     }
 
     public GunProfile getGun() {
@@ -172,11 +177,11 @@ public class GunItem extends BaseGeoItem {
 
     @Override
     @SuppressWarnings("deprecation")
-    public void appendHoverText(@NonNull ItemStack itemStack, @NonNull TooltipContext context, @NonNull TooltipDisplay display, @NonNull Consumer<Component> builder, @NonNull TooltipFlag tooltipFlag) {
-        super.appendHoverText(itemStack, context, display, builder, tooltipFlag);
-        Consumer<Component> statBuilder = (component) -> builder.accept(Component.literal(" ").append(component).withStyle(ChatFormatting.DARK_GREEN));
+    public void appendHoverText(@NonNull ItemStack itemStack, @NonNull TooltipContext context, @NonNull List<Component> builder, @NonNull TooltipFlag tooltipFlag) {
+        super.appendHoverText(itemStack, context, builder, tooltipFlag);
+        Consumer<Component> statBuilder = (component) -> builder.add(Component.literal(" ").append(component).withStyle(ChatFormatting.DARK_GREEN));
         Function<String, Component> highlightText = s -> Component.literal(s).withStyle(ChatFormatting.GREEN);
-        ShotProfile shotProfile = GunplayManager.compose(context.player(), this.gunProfile, itemStack);
+        ShotProfile shotProfile = GunplayManager.compose(null, this.gunProfile, itemStack);
         String damage = ItemAttributeModifiers.ATTRIBUTE_MODIFIER_FORMAT.format(shotProfile.value(ShotComponents.DAMAGE));
         int bulletCount = (int) shotProfile.value(ShotComponents.PROJECTILE_COUNT);
         int bulletSpeedPercent = (int) (100 * shotProfile.value(ShotComponents.BULLET_SPEED) / Bullet.BASE_SPEED);
@@ -197,7 +202,7 @@ public class GunItem extends BaseGeoItem {
         }
         statBuilder.accept(Component.translatable("irons_artifice.tooltip.reload_time", highlightText.apply(reloadTime + "s")));
         statBuilder.accept(Component.translatable("irons_artifice.tooltip.ammo_capacity", highlightText.apply("" + gunProfile.magazineCapacity())));
-        builder.accept(Component.translatable("irons_artifice.tooltip.modifier_count",
+        builder.add(Component.translatable("irons_artifice.tooltip.modifier_count",
                         gunProfile.modifierSlots()
                 ).withStyle(ChatFormatting.GOLD)
                 .append(" ").append(Component.translatable("irons_artifice.tooltip.keybind_hint",
@@ -207,7 +212,7 @@ public class GunItem extends BaseGeoItem {
         GunContainer container = new GunContainer(itemStack);
         for (var item : container.getItems()) {
             if (!item.isEmpty()) {
-                builder.accept(Component.literal(" * ").withStyle(ChatFormatting.DARK_GRAY).append(item.getHoverName().copy().withStyle(ChatFormatting.GRAY)));
+                builder.add(Component.literal(" * ").withStyle(ChatFormatting.DARK_GRAY).append(item.getHoverName().copy().withStyle(ChatFormatting.GRAY)));
             }
         }
     }
@@ -254,15 +259,15 @@ public class GunItem extends BaseGeoItem {
     @Override
     public void registerControllers(AnimatableManager.@NonNull ControllerRegistrar controllers) {
         super.registerControllers(controllers);
-        controllers.add(new AnimationController<>(IDLE_ANIMATION_CONTROLLER, this::gunIdleHandler));
-        controllers.add(new OffsetableAnimationController<>(GunAnimations.CONTROLLER_ACTIONS, test -> PlayState.STOP)
+        controllers.add(new AnimationController<>(this, IDLE_ANIMATION_CONTROLLER, this::gunIdleHandler));
+        controllers.add(new OffsetableAnimationController<>(this, GunAnimations.CONTROLLER_ACTIONS, test -> PlayState.STOP)
                 .triggerableAnim(GunAnimations.FIRE, RawAnimation.begin().thenPlay(GunAnimations.FIRE))
                 .triggerableAnim(GunAnimations.RELOAD, RawAnimation.begin().thenPlay(GunAnimations.RELOAD))
                 .triggerableAnim(GunAnimations.EQUIP, RawAnimation.begin().thenPlay(GunAnimations.EQUIP))
         );
     }
 
-    private PlayState gunIdleHandler(AnimationTest<GunItem> animationTest) {
+    private PlayState gunIdleHandler(AnimationState<GunItem> animationTest) {
         animationTest.setAnimation(RawAnimation.begin().thenPlayAndHold(GunAnimations.IDLE));
         return PlayState.CONTINUE;
     }
@@ -275,49 +280,41 @@ public class GunItem extends BaseGeoItem {
         }
     }
 
-    private static class OffsetableAnimationController<T extends GeoAnimatable> extends AnimationController<T> {
-        private double skipAtSeconds;
-        private double skipToSeconds;
+    public static class OffsetableAnimationController<T extends GeoAnimatable> extends AnimationController<T> {
+        private double pendingOffsetTicks;
+        private double skipAtTicks;
+        private double skipToTicks;
         private boolean skipped;
 
-        public OffsetableAnimationController(String name, AnimationStateHandler<T> stateHandler) {
-            super(name, stateHandler);
+        public OffsetableAnimationController(T animatable, String name, AnimationStateHandler<T> stateHandler) {
+            super(animatable, name, stateHandler);
         }
 
         public void setTimelineSkip(double skipAtSeconds, double skipToSeconds) {
-            this.skipAtSeconds = skipAtSeconds;
-            this.skipToSeconds = skipToSeconds;
+            this.skipAtTicks = skipAtSeconds * 20.0;
+            this.skipToTicks = skipToSeconds * 20.0;
             this.skipped = false;
         }
 
-        private boolean applyTimelineSkip() {
-            if (skipped || skipToSeconds <= skipAtSeconds || timelineTime < skipAtSeconds || timelineTime >= skipToSeconds) {
-                return false;
-            }
-            timelineTime = skipToSeconds;
-            skipped = true;
-            return true;
+        public void setTimelineOffset(double offsetSeconds) {
+            this.pendingOffsetTicks = Math.max(0, offsetSeconds * 20.0);
         }
 
         @Override
-        protected void initializeNewAnimation(T animatable, GeoRenderState renderState, GeoModel<T> geoModel, double prevAnimSpeed, int prevTransitionTicks) {
-            double offset = timelineTime;
-            super.initializeNewAnimation(animatable, renderState, geoModel, prevAnimSpeed, prevTransitionTicks);
-            if (offset > 0) {
-                timelineTime = offset;
+        protected double adjustTick(double tick) {
+            double adjusted = super.adjustTick(tick);
+            double speed = Math.max(0.0001, getAnimationSpeed());
+            if (pendingOffsetTicks > 0) {
+                this.tickOffset -= pendingOffsetTicks / speed;
+                adjusted = pendingOffsetTicks;
+                pendingOffsetTicks = 0;
             }
-            boolean skippedNow = applyTimelineSkip();
-            if (this.timeline != null && (offset > 0 || skippedNow)) {
-                this.animationPoint = this.timeline.createAnimationPoint(this.timelineTime, this.animationPoint, this.easingOverride);
+            if (!skipped && skipToTicks > skipAtTicks && adjusted >= skipAtTicks && adjusted < skipToTicks) {
+                this.tickOffset -= (skipToTicks - adjusted) / speed;
+                adjusted = skipToTicks;
+                skipped = true;
             }
-        }
-
-        @Override
-        protected void progressExistingAnimation(T animatable, GeoRenderState renderState, double prevTimelineTime, double timeAdvanced) {
-            if (applyTimelineSkip()) {
-                prevTimelineTime = timelineTime;
-            }
-            super.progressExistingAnimation(animatable, renderState, prevTimelineTime, timeAdvanced);
+            return adjusted;
         }
 
     }

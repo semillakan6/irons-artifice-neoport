@@ -1,17 +1,23 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "#": "minecraft:lapis_lazuli",
-    "*": "irons_artifice:bullet",
-    "B": "irons_artifice:blackpowder"
-  },
-  "pattern": [
-    " ##",
-    "B*#",
-    " B "
-  ],
-  "result": {
-    "id": "irons_artifice:enchanted_bullet_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "#":  {
+                          "item":  "minecraft:lapis_lazuli"
+                      },
+                "*":  {
+                          "item":  "irons_artifice:bullet"
+                      },
+                "B":  {
+                          "item":  "irons_artifice:blackpowder"
+                      }
+            },
+    "pattern":  [
+                    " ##",
+                    "B*#",
+                    " B "
+                ],
+    "result":  {
+                   "id":  "irons_artifice:enchanted_bullet_modifier"
+               }
 }

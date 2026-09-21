@@ -1,6 +1,6 @@
 package io.redspace.irons_artifice.data;
 
-import net.minecraft.util.ARGB;
+import io.redspace.irons_artifice.utils.ARGB;
 import net.minecraft.util.RandomSource;
 import org.joml.Vector3f;
 

@@ -8,7 +8,7 @@ import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.ARGB;
+import io.redspace.irons_artifice.utils.ARGB;
 import org.joml.Vector3f;
 
 public class ColorTransitionParticleOption implements ParticleOptions {

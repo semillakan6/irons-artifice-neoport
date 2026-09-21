@@ -4,12 +4,14 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.redspace.irons_artifice.client.ClientHelper;
+import io.redspace.irons_artifice.client.BayonetAnimations;
 import io.redspace.irons_artifice.item.GunItem;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,9 +23,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class ItemInHandRendererMixin {
 
     @Inject(method = "renderArmWithItem", at = @At("HEAD"), cancellable = true)
-    private void irons_artifice$hideHandsForScoping(AbstractClientPlayer player, float frameInterp, float xRot, InteractionHand hand, float attack, ItemStack itemStack, float inverseArmHeight, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int lightCoords, CallbackInfo ci) {
+    private void irons_artifice$hideHandsForScoping(AbstractClientPlayer player, float frameInterp, float xRot, InteractionHand hand, float attack, ItemStack itemStack, float inverseArmHeight, PoseStack poseStack, MultiBufferSource bufferSource, int lightCoords, CallbackInfo ci) {
         if (GunItem.isScoping(player)) {
             ci.cancel();
+        } else if (GunItem.isChargingBayonet(player) && player.getUsedItemHand() == hand) {
+            HumanoidArm arm = hand == InteractionHand.MAIN_HAND ? player.getMainArm() : player.getMainArm().getOpposite();
+            BayonetAnimations.firstPersonUse(0, poseStack, player.getTicksUsingItem() + frameInterp, arm, itemStack);
         }
     }
 
@@ -31,7 +36,7 @@ public class ItemInHandRendererMixin {
             method = "renderArmWithItem",
             at = @At("HEAD"),
             argsOnly = true,
-            name = "inverseArmHeight")
+            index = 7)
     private float irons_artifice$zeroGunEquipOffset(
             float inverseArmHeight,
             AbstractClientPlayer player,
@@ -48,7 +53,7 @@ public class ItemInHandRendererMixin {
             method = "renderHandsWithItems",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V"
+                    target = "Lnet/minecraft/client/renderer/ItemInHandRenderer;renderArmWithItem(Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;I)V"
             )
     )
     private void irons_artifice$hideOtherHandForTwoHandedGun(
@@ -61,7 +66,7 @@ public class ItemInHandRendererMixin {
             ItemStack itemStack,
             float inverseArmHeight,
             PoseStack poseStack,
-            SubmitNodeCollector submitNodeCollector,
+            MultiBufferSource bufferSource,
             int lightCoords,
             Operation<Void> original
     ) {
@@ -71,7 +76,7 @@ public class ItemInHandRendererMixin {
                 return;
             }
         }
-        original.call(instance, player, frameInterp, xRot, hand, attack, itemStack, inverseArmHeight, poseStack, submitNodeCollector, lightCoords);
+        original.call(instance, player, frameInterp, xRot, hand, attack, itemStack, inverseArmHeight, poseStack, bufferSource, lightCoords);
     }
 
 }

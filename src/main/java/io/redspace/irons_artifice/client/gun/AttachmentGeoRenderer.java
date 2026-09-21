@@ -1,44 +1,35 @@
 package io.redspace.irons_artifice.client.gun;
 
-import com.geckolib.animatable.GeoAnimatable;
-import com.geckolib.animatable.instance.AnimatableInstanceCache;
-import com.geckolib.animatable.manager.AnimatableManager;
-import com.geckolib.constant.DataTickets;
-import com.geckolib.model.GeoModel;
-import com.geckolib.renderer.GeoObjectRenderer;
-import com.geckolib.renderer.base.GeoRenderState;
-import com.geckolib.renderer.base.RenderPassInfo;
-import com.geckolib.util.GeckoLibUtil;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import org.jspecify.annotations.NonNull;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import software.bernie.geckolib.animatable.GeoAnimatable;
+import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.animation.AnimatableManager;
+import software.bernie.geckolib.model.GeoModel;
+import software.bernie.geckolib.renderer.GeoObjectRenderer;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.RenderType;
+import software.bernie.geckolib.util.GeckoLibUtil;
 
-public class AttachmentGeoRenderer extends GeoObjectRenderer<GeoAnimatable, Void, GeoRenderState> {
-    private final GeoAnimatable animatable = new StaticAttachment();
+public class AttachmentGeoRenderer extends GeoObjectRenderer<GeoAnimatable> {
+    private final GeoAnimatable attachment = new StaticAttachment();
 
     public AttachmentGeoRenderer(GeoModel<GeoAnimatable> model) {
         super(model);
     }
 
-    public void performRenderPass(@NonNull RenderPassInfo<?> parentPass, @NonNull SubmitNodeCollector renderTasks) {
-        performRenderPass(
-                this.animatable,
-                null,
-                parentPass.poseStack(),
-                renderTasks,
-                parentPass.cameraState(),
-                parentPass.packedLight(),
-                parentPass.getOrDefaultGeckolibData(DataTickets.PARTIAL_TICK, 0f)
-        );
+    public void render(PoseStack poseStack, MultiBufferSource buffers, int packedLight, float partialTick) {
+        var renderType = getRenderType(attachment, getTextureLocation(attachment), buffers, partialTick);
+        super.render(poseStack, attachment, buffers, renderType, buffers.getBuffer(renderType), packedLight, partialTick);
     }
 
     @Override
-    public void adjustRenderPose(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo) {
-        return;
-    }
-
-    @Override
-    public long getInstanceId(GeoAnimatable animatable, Void relatedObject) {
-        return 0L;
+    public void preRender(PoseStack poseStack, GeoAnimatable animatable, BakedGeoModel model,
+                          MultiBufferSource buffers, VertexConsumer buffer, boolean isReRender,
+                          float partialTick, int packedLight, int packedOverlay, int color) {
+        // The parent gun renderer has already positioned the pose at the attachment bone.
+        // GeoObjectRenderer's default half-block translation would detach the model.
     }
 
     private static class StaticAttachment implements GeoAnimatable {
@@ -50,7 +41,12 @@ public class AttachmentGeoRenderer extends GeoObjectRenderer<GeoAnimatable, Void
 
         @Override
         public AnimatableInstanceCache getAnimatableInstanceCache() {
-            return this.cache;
+            return cache;
+        }
+
+        @Override
+        public double getTick(Object relatedObject) {
+            return software.bernie.geckolib.util.RenderUtil.getCurrentTick();
         }
     }
 }

@@ -1,6 +1,6 @@
 package io.redspace.irons_artifice.config;
 
-import net.minecraft.util.ARGB;
+import io.redspace.irons_artifice.utils.ARGB;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class ClientConfig {

@@ -1,16 +1,7 @@
 package io.redspace.irons_artifice.client.gun;
 
-import com.geckolib.animatable.GeoItem;
-import com.geckolib.animation.state.BoneSnapshot;
-import com.geckolib.cache.model.GeoBone;
-import com.geckolib.constant.DataTickets;
-import com.geckolib.model.GeoModel;
-import com.geckolib.renderer.GeoItemRenderer;
-import com.geckolib.renderer.base.BoneSnapshots;
-import com.geckolib.renderer.base.GeoRenderState;
-import com.geckolib.renderer.base.RenderPassInfo;
 import com.mojang.blaze3d.vertex.PoseStack;
-import io.redspace.irons_artifice.api.GunAnimations;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.redspace.irons_artifice.api.GunBones;
 import io.redspace.irons_artifice.client.MuzzleFlashEmitter;
 import io.redspace.irons_artifice.data.HandOccupancy;
@@ -23,257 +14,178 @@ import io.redspace.irons_artifice.item.ReloadState;
 import io.redspace.irons_artifice.item.animation_adjuster.AnimationAdjuster;
 import io.redspace.irons_artifice.registry.DataComponentRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.entity.player.AvatarRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.player.PlayerRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
-import org.joml.Matrix3f;
-import org.jspecify.annotations.NonNull;
+import net.minecraft.world.item.ItemStack;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
+import software.bernie.geckolib.model.GeoModel;
+import software.bernie.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
+import software.bernie.geckolib.util.RenderUtil;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 public class GunInHandRenderer extends GeoItemRenderer<GunItem> {
+    private static final Set<ItemDisplayContext> HAND_CONTEXTS = Set.of(
+            ItemDisplayContext.FIRST_PERSON_RIGHT_HAND, ItemDisplayContext.FIRST_PERSON_LEFT_HAND,
+            ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, ItemDisplayContext.THIRD_PERSON_LEFT_HAND);
+
+    private AttachmentMap attachments = AttachmentMap.EMPTY;
+    private HandOccupancy occupancy = HandOccupancy.BOTH;
+    private int ownerId = -1;
+    private boolean boneAdjustmentsApplied;
+    private float renderPartialTick;
 
     public GunInHandRenderer(GeoModel<GunItem> model) {
         super(model);
+        addRenderLayer(new GunBoneLayer(this));
     }
 
     @Override
-    public void preRenderPass(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull SubmitNodeCollector renderTasks) {
-        super.preRenderPass(renderPassInfo, renderTasks);
-        handleAttachmentRendering(renderPassInfo, renderTasks);
-        handleMuzzleFlashEmission(renderPassInfo);
-        handleFirstPersonHandRendering(renderPassInfo, renderTasks);
-    }
-
-    protected void handleAttachmentRendering(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull SubmitNodeCollector renderTasks) {
-        AttachmentMap attachments = renderPassInfo.getGeckolibData(GunItem.ATTACHMENTS);
-        if (attachments == null || attachments.isEmpty()) {
-            return;
-        }
-        for (var entry : attachments.attachments().entrySet()) {
-            Optional<AttachmentGeoRenderer> renderer = AttachmentRenderableRegistry.get(entry.getValue());
-            if (renderer.isEmpty()) {
-                continue;
-            }
-            Optional<GeoBone> attachmentOpt = renderPassInfo.model().getBone(entry.getKey());
-            if (attachmentOpt.isEmpty()) {
-                continue;
-            }
-            renderPassInfo.addPerBoneRender(attachmentOpt.get(), (opticPass, bone, opticTasks) ->
-                    renderer.get().performRenderPass(opticPass, opticTasks)
-            );
-        }
-    }
-
-    protected void handleMuzzleFlashEmission(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo) {
-        if (!isHandPerspective(renderPassInfo.renderState())) {
-            return;
-        }
-        Integer ownerId = renderPassInfo.getGeckolibData(GunItem.ITEM_OWNER_ID_TICKET);
-        if (ownerId == null) {
-            return;
-        }
-        renderPassInfo.model().getBone(GunBones.SOCKET_MUZZLE).ifPresent(bone ->
-                renderPassInfo.addPerBoneRender(bone, (pass, muzzleBone, tasks) ->
-                        MuzzleFlashEmitter.tryEmit(ownerId, pass.poseStack())
-                )
-        );
-    }
-
-    protected void handleFirstPersonHandRendering(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull SubmitNodeCollector renderTasks) {
-        // Use Marker Bones "right_arm" and "left_arm" to render the player's hands in first person
-        if (!isFirstPersonPerspective(renderPassInfo.renderState())) {
-            return;
-        }
-
-        final GeoRenderState renderState = renderPassInfo.renderState();
+    public void renderByItem(ItemStack stack, ItemDisplayContext perspective, PoseStack poseStack,
+                             MultiBufferSource buffers, int packedLight, int packedOverlay) {
+        attachments = stack.getOrDefault(DataComponentRegistry.ATTACHMENT, AttachmentMap.EMPTY);
+        occupancy = HandOccupancy.BOTH;
+        ownerId = -1;
+        boneAdjustmentsApplied = false;
         AbstractClientPlayer player = Minecraft.getInstance().player;
-        if (player == null) {
-            return;
+        if (player != null && (stack == player.getMainHandItem() || stack == player.getOffhandItem())) {
+            HandOccupancy value = GunItem.currentOccupancy(player, stack);
+            occupancy = value == null ? HandOccupancy.BOTH : value;
+            ownerId = player.getId();
         }
-        if (!(Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(player) instanceof AvatarRenderer renderer)) {
-            return;
-        }
-        Identifier skinTexture = player.getSkin().body().texturePath();
-        final RenderType renderType = getRenderType(renderState, skinTexture);
-        renderPassInfo.model().getBone(GunBones.RIGHT_ARM).ifPresent(bone ->
-                renderPassInfo.addPerBoneRender(bone, (renderPassInfo1, bone1, renderTasks1) -> {
-                            var modelPart = ((PlayerModel) renderer.getModel()).rightArm;
-                            renderFirstPersonHand(renderTasks, renderType, modelPart, renderPassInfo.poseStack().last(), renderPassInfo);
-                        }
-                )
-        );
-        HandOccupancy occupancy = renderPassInfo.getOrDefaultGeckolibData(GunItem.HAND_OCCUPANCY_TICKET, HandOccupancy.BOTH);
-        if (occupancy == HandOccupancy.BOTH) {
-            renderPassInfo.model().getBone(GunBones.LEFT_ARM).ifPresent(bone ->
-                    renderPassInfo.addPerBoneRender(bone, (renderPassInfo1, bone1, renderTasks1) -> {
-                                var modelPart = ((PlayerModel) renderer.getModel()).leftArm;
-                                renderFirstPersonHand(renderTasks, renderType, modelPart, renderPassInfo.poseStack().last(), renderPassInfo);
-                            }
-                    )
-            );
-        }
+        super.renderByItem(stack, perspective, poseStack, buffers, packedLight, packedOverlay);
     }
 
     @Override
-    @SuppressWarnings("all")
-    public void captureDefaultRenderState(GunItem animatable, RenderData renderData, GeoRenderState renderState, float partialTick) {
-        super.captureDefaultRenderState(animatable, renderData, renderState, partialTick);
-        if (MagazineContents.has(renderData.itemStack())) {
-            renderState.addGeckolibData(GunItem.MAGAZINE_ANIMATION_TICKET, MagazineContents.get(renderData.itemStack()));
+    public void preRender(PoseStack poseStack, GunItem gun, BakedGeoModel model, MultiBufferSource buffers,
+                          VertexConsumer buffer, boolean isReRender, float partialTick,
+                          int packedLight, int packedOverlay, int color) {
+        renderPartialTick = partialTick;
+        if (renderPerspective == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
+                || renderPerspective == ItemDisplayContext.THIRD_PERSON_LEFT_HAND) {
+            poseStack.scale(-1, 1, 1);
         }
-        var controller = animatable.getAnimatableInstanceCache().getManagerForId(GeoItem.getId(renderData.itemStack())).getAnimationControllers().get(GunItem.TRIGGERED_ANIMATION_CONTROLLER);
-        renderState.addGeckolibData(GunItem.RELOAD_PROGRESS_SECONDS_TICKET, controller.isTriggeredAnimation(GunAnimations.RELOAD) ? controller.getCurrentAnimationTime() : 0.0);
-        ReloadState reload = ReloadState.get(renderData.itemStack());
-        renderState.addGeckolibData(GunItem.RELOAD_PERCENT_TICKET, reload != null ? reload.percent(partialTick) : 0f);
-        renderState.addGeckolibData(
-                GunItem.MUZZLE_OFFSET_TICKET,
-                (float) GunplayManager.compose(null, animatable.getGun(), renderData.itemStack()).value(ShotComponents.MUZZLE_OFFSET)
-        );
-        renderState.addGeckolibData(GunItem.ANIMATION_ADJUSTERS_TICKET, animatable.getGun().animationAdjusters());
-        renderState.addGeckolibData(
-                GunItem.ATTACHMENTS,
-                renderData.itemStack().getOrDefault(DataComponentRegistry.ATTACHMENT, AttachmentMap.EMPTY)
-        );
-        if (renderData.itemOwner() instanceof LivingEntity living) {
-            HandOccupancy occupancy = GunItem.currentOccupancy(living, renderData.itemStack());
-            renderState.addGeckolibData(GunItem.HAND_OCCUPANCY_TICKET, occupancy);
-            renderState.addGeckolibData(GunItem.ITEM_OWNER_ID_TICKET, living.getId());
-        }
+        super.preRender(poseStack, gun, model, buffers, buffer, isReRender, partialTick,
+                packedLight, packedOverlay, color);
     }
 
     @Override
-    public void adjustRenderPose(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo) {
-        super.adjustRenderPose(renderPassInfo);
-        var perspective = renderPassInfo.renderState().getGeckolibData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        if (perspective != null && perspective.leftHand()) {
-            PoseStack.Pose last = renderPassInfo.poseStack().last();
-            last.pose().scale(-1f, 1f, 1f);
-            // compensate for weird lighting
-            Matrix3f normal = last.normal();
-            normal.scale(-1, -1, 1);
+    public void renderRecursively(PoseStack poseStack, GunItem gun, GeoBone bone, RenderType renderType,
+                                  MultiBufferSource buffers, VertexConsumer buffer, boolean isReRender,
+                                  float partialTick, int packedLight, int packedOverlay, int color) {
+        // GeckoLib 4 evaluates animations after preRender. Apply the 26.x perspective
+        // normalization here, immediately before the first bone is drawn, so first-person
+        // root transforms cannot leak into GUI, FIXED, ground, or frame renders.
+        if (!boneAdjustmentsApplied) {
+            applyBoneAdjustments(gun, renderPartialTick);
+            boneAdjustmentsApplied = true;
         }
+        super.renderRecursively(poseStack, gun, bone, renderType, buffers, buffer, isReRender,
+                partialTick, packedLight, packedOverlay, color);
     }
 
-    @Override
-    public void adjustModelBonesForRender(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull BoneSnapshots snapshots) {
-        super.adjustModelBonesForRender(renderPassInfo, snapshots);
-        handlePerspectiveAdjustments(renderPassInfo, snapshots);
-        handleGunAdjustments(renderPassInfo, snapshots);
-    }
-
-    protected void handlePerspectiveAdjustments(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull BoneSnapshots snapshots) {
-        var perspective = renderPassInfo.renderState().getGeckolibData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        if (perspective == null) {
-            return;
-        }
-        Set<ItemDisplayContext> allowed = Set.of(ItemDisplayContext.FIRST_PERSON_RIGHT_HAND, ItemDisplayContext.FIRST_PERSON_LEFT_HAND, ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, ItemDisplayContext.THIRD_PERSON_LEFT_HAND);
-        if (allowed.contains(perspective)) {
-            normalizeThirdPersonGunAnimations(renderPassInfo, snapshots);
-        } else {
-            silenceAnimations(renderPassInfo, snapshots);
-        }
-    }
-
-    protected void silenceAnimations(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull BoneSnapshots snapshots) {
-        // silence it all (for gui, ground, and other perspectives where animations shouldn't be visible)
-        List<String> bones = collectBones(renderPassInfo.model().topLevelBones(), new ArrayList<>());
-        bones.forEach(boneName -> {
-            // allow hammers to still animate, so that we can see whether a gun is cocked or not on the ground
-            if (!boneName.contains(GunBones.HAMMER)) {
-                silenceBone(boneName, snapshots);
+    private void applyBoneAdjustments(GunItem gun, float partialTick) {
+        if (!HAND_CONTEXTS.contains(renderPerspective)) {
+            for (GeoBone bone : getGeoModel().getAnimationProcessor().getRegisteredBones()) {
+                if (!bone.getName().contains(GunBones.HAMMER)) {
+                    restoreInitialTransform(bone, true);
+                }
             }
-        });
-    }
-
-    protected List<String> collectBones(GeoBone[] bones, List<String> collector) {
-        for (GeoBone bone : bones) {
-            if (bone == null) continue;
-            collector.add(bone.name());
-            collectBones(bone.children(), collector);
+        } else if (!isFirstPerson()) {
+            getGeoModel().getBone(GunBones.ROOT).ifPresent(root -> restoreInitialTransform(root, false));
         }
-        return collector;
+
+        // Match the original renderer order: clear perspective animation first, then
+        // restore state-driven parts such as magazines, hammers, and muzzle offsets.
+        ItemStack stack = getCurrentItemStack();
+        MagazineContents magazine = GunItem.getMagazine(stack);
+        ReloadState reload = ReloadState.get(stack);
+        float reloadPercent = reload == null ? 0 : reload.percent(partialTick);
+        double reloadSeconds = reload == null ? 0 : reloadPercent * reload.durationTicks() / 20.0;
+        float muzzleOffset = (float) GunplayManager.compose(null, gun.getGun(), stack)
+                .value(ShotComponents.MUZZLE_OFFSET);
+        AnimationAdjuster.Context context = new AnimationAdjuster.Context(
+                getGeoModel(), magazine, reloadSeconds, reloadPercent, muzzleOffset);
+        for (AnimationAdjuster adjuster : gun.getGun().animationAdjusters()) {
+            adjuster.adjust(context);
+        }
     }
 
-    protected void silenceBone(String name, BoneSnapshots snapshots) {
-        Optional<BoneSnapshot> opt = snapshots.get(name);
-        if (opt.isEmpty()) {
+    private static void restoreInitialTransform(GeoBone bone, boolean restoreScale) {
+        // GeckoLib 4 stores a model bone's baked rotation in the same fields used by
+        // animation output. Resetting those fields to zero breaks structural bones
+        // such as the clockwork rifle's -45/+45 degree stock pair. The initial
+        // snapshot is the unanimated model pose and is therefore the correct reset.
+        var initial = bone.getInitialSnapshot();
+        bone.updatePosition(initial.getOffsetX(), initial.getOffsetY(), initial.getOffsetZ());
+        bone.updateRotation(initial.getRotX(), initial.getRotY(), initial.getRotZ());
+        if (restoreScale) {
+            bone.updateScale(initial.getScaleX(), initial.getScaleY(), initial.getScaleZ());
+        }
+    }
+
+    private boolean isFirstPerson() {
+        return renderPerspective == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
+                || renderPerspective == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
+    }
+
+    private final class GunBoneLayer extends GeoRenderLayer<GunItem> {
+        private GunBoneLayer(GunInHandRenderer renderer) {
+            super(renderer);
+        }
+
+        @Override
+        public void renderForBone(PoseStack poseStack, GunItem gun, GeoBone bone, RenderType renderType,
+                                  MultiBufferSource buffers, VertexConsumer buffer, float partialTick,
+                                  int packedLight, int packedOverlay) {
+            var attachment = attachments.attachments().get(bone.getName());
+            if (attachment != null) {
+                AttachmentRenderableRegistry.get(attachment).ifPresent(renderer -> {
+                    poseStack.pushPose();
+                    RenderUtil.translateToPivotPoint(poseStack, bone);
+                    renderer.render(poseStack, buffers, packedLight, partialTick);
+                    poseStack.popPose();
+                });
+            }
+            if (bone.getName().equals(GunBones.SOCKET_MUZZLE) && ownerId >= 0 && HAND_CONTEXTS.contains(renderPerspective)) {
+                poseStack.pushPose();
+                RenderUtil.translateToPivotPoint(poseStack, bone);
+                MuzzleFlashEmitter.tryEmit(ownerId, poseStack);
+                poseStack.popPose();
+            }
+            if (isFirstPerson()) {
+                if (bone.getName().equals(GunBones.RIGHT_ARM)) {
+                    renderHand(poseStack, buffers, packedLight, true);
+                } else if (bone.getName().equals(GunBones.LEFT_ARM) && occupancy == HandOccupancy.BOTH) {
+                    renderHand(poseStack, buffers, packedLight, false);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void renderHand(PoseStack poseStack, MultiBufferSource buffers, int packedLight, boolean right) {
+        AbstractClientPlayer player = Minecraft.getInstance().player;
+        if (player == null || !(Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(player) instanceof PlayerRenderer renderer)) {
             return;
         }
-        BoneSnapshot root = opt.get();
-        root.setTranslation(0, 0, 0);
-        root.setRotation(0, 0, 0);
-        root.setScale(1, 1, 1);
-    }
-
-    protected void handleGunAdjustments(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull BoneSnapshots snapshots) {
-        List<AnimationAdjuster> adjusters = renderPassInfo.getGeckolibData(GunItem.ANIMATION_ADJUSTERS_TICKET);
-        if (adjusters == null || adjusters.isEmpty()) {
-            return;
-        }
-        for (AnimationAdjuster adjuster : adjusters) {
-            adjuster.adjust(renderPassInfo, snapshots);
-        }
-    }
-
-    protected void normalizeThirdPersonGunAnimations(@NonNull RenderPassInfo<GeoRenderState> renderPassInfo, @NonNull BoneSnapshots snapshots) {
-        // Root bone tends to contain large animations that only make sense in first person.
-        // Cancel them out in third person viewers
-        if (isFirstPersonPerspective(renderPassInfo.renderState())) {
-            return;
-        }
-        Optional<BoneSnapshot> rootOpt = snapshots.get(GunBones.ROOT);
-        if (rootOpt.isEmpty()) {
-            return;
-        }
-        BoneSnapshot root = rootOpt.get();
-        root.setTranslation(0, 0, 0);
-        root.setRotation(0, 0, 0);
-    }
-
-    protected void renderFirstPersonHand(SubmitNodeCollector renderTasks, RenderType renderType, ModelPart modelPart, PoseStack.Pose pose, RenderPassInfo<GeoRenderState> renderPassInfo) {
-        modelPart.x = 0;
-        modelPart.y = 0;
-        modelPart.z = 0;
-        modelPart.xRot = 0;
-        modelPart.yRot = 0;
-        modelPart.zRot = 0;
-        final PoseStack poseStack = new PoseStack();
-        poseStack.last().set(pose);
+        PlayerModel<AbstractClientPlayer> playerModel = renderer.getModel();
+        ModelPart arm = right ? playerModel.rightArm : playerModel.leftArm;
+        arm.setPos(0, 0, 0);
+        arm.setRotation(0, 0, 0);
+        poseStack.pushPose();
         poseStack.scale(-1, -1, 1);
-        // no clue where these numbers come from (manually lined up from block bench)
-        poseStack.translate(1 / 16f, -10 / 16f, 0 / 16f);
-        renderTasks.submitModelPart(
-                modelPart,
-                poseStack,
-                renderType,
-                renderPassInfo.packedLight(),
-                OverlayTexture.NO_OVERLAY,
-                null
-        );
-    }
-
-    protected boolean isHandPerspective(GeoRenderState renderState) {
-        var perspective = renderState.getGeckolibData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        return perspective == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
-                || perspective == ItemDisplayContext.FIRST_PERSON_LEFT_HAND
-                || perspective == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND
-                || perspective == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
-    }
-
-    protected boolean isFirstPersonPerspective(GeoRenderState renderState) {
-        var perspective = renderState.getGeckolibData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        return perspective == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND || perspective == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
+        poseStack.translate(1 / 16f, -10 / 16f, 0);
+        arm.render(poseStack, buffers.getBuffer(RenderType.entitySolid(player.getSkin().texture())),
+                packedLight, OverlayTexture.NO_OVERLAY);
+        poseStack.popPose();
     }
 }
-

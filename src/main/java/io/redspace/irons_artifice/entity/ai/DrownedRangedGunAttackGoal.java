@@ -2,7 +2,7 @@ package io.redspace.irons_artifice.entity.ai;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.monster.zombie.Drowned;
+import net.minecraft.world.entity.monster.Drowned;
 import org.jspecify.annotations.NonNull;
 
 public class DrownedRangedGunAttackGoal extends RangedGunAttackGoal<Drowned> {

@@ -8,11 +8,15 @@ import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.util.Unit;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 public final class DataComponentRegistry {
+    private static final StreamCodec<RegistryFriendlyByteBuf, Unit> UNIT_STREAM_CODEC =
+            StreamCodec.of((buffer, value) -> {}, buffer -> Unit.INSTANCE);
     public static final DeferredRegister.DataComponents COMPONENTS =
             DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, IronsArtifice.MODID);
 
@@ -31,7 +35,11 @@ public final class DataComponentRegistry {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Unit>> GUN_SPYGLASS =
             COMPONENTS.registerComponentType("gun_spyglass", builder -> builder
                     .persistent(Unit.CODEC)
-                    .networkSynchronized(Unit.STREAM_CODEC));
+                    .networkSynchronized(UNIT_STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Unit>> BAYONET =
+            COMPONENTS.registerComponentType("bayonet", builder -> builder
+                    .persistent(Unit.CODEC)
+                    .networkSynchronized(UNIT_STREAM_CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<AttachmentMap>> ATTACHMENT =
             COMPONENTS.registerComponentType("attachment", builder -> builder
                     .persistent(AttachmentMap.CODEC)

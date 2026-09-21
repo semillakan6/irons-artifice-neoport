@@ -6,18 +6,19 @@ import io.redspace.irons_artifice.gun.ShotProfile;
 import io.redspace.irons_artifice.item.GunItem;
 import io.redspace.irons_artifice.item.GunplayManager;
 import io.redspace.irons_artifice.item.ReloadState;
+import com.mojang.math.Axis;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
+
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import org.joml.Matrix3x2fStack;
+import com.mojang.blaze3d.vertex.PoseStack;
 
 @EventBusSubscriber(modid = IronsArtifice.MODID, value = Dist.CLIENT)
 public final class CrosshairRenderer {
@@ -31,7 +32,7 @@ public final class CrosshairRenderer {
     private static int reloadAnimationDuration;
     private static int reloadAnimationTick;
 
-    public static boolean renderGunCrosshair(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+    public static boolean renderGunCrosshair(GuiGraphics graphics, DeltaTracker deltaTracker) {
         Minecraft minecraft = Minecraft.getInstance();
         if (!minecraft.options.getCameraType().isFirstPerson()) {
             return false;
@@ -47,25 +48,24 @@ public final class CrosshairRenderer {
 
         float partialTick = deltaTracker.getGameTimeDeltaPartialTick(false);
         float degreesSpread = localCrosshairGap(partialTick);
-        float gap = Math.max(GAP_BASE + degreesToGuiPixels(degreesSpread, graphics.guiHeight(), minecraft.gameRenderer.getMainCamera().getFov()), 0);
-        graphics.nextStratum();
-        Matrix3x2fStack poseStack = graphics.pose();
-        poseStack.pushMatrix();
-        poseStack.translate(graphics.guiWidth() / 2 - 1, graphics.guiHeight() / 2);
+        float gap = Math.max(GAP_BASE + degreesToGuiPixels(degreesSpread, graphics.guiHeight(), minecraft.options.fov().get()), 0);
+        PoseStack poseStack = graphics.pose();
+        poseStack.pushPose();
+        poseStack.translate(graphics.guiWidth() / 2f - 1, graphics.guiHeight() / 2f, 0);
         if (reloadAnimationTick > 0) {
-            poseStack.translate(0.5f, 0.5f);
+            poseStack.translate(0.5f, 0.5f, 0);
             float f = (reloadAnimationTick - partialTick) / reloadAnimationDuration;
 
 //            float remaining = 1f - Mth.lerp(partialTick, reloadProgressO, reloadProgress);
             f = crosshairAnimationInterpolation(f);
-            poseStack.rotate(f * 180 * Mth.DEG_TO_RAD);
-            poseStack.translate(-0.5f, -0.5f);
+            poseStack.mulPose(Axis.ZP.rotation(f * 180 * Mth.DEG_TO_RAD));
+            poseStack.translate(-0.5f, -0.5f, 0);
         }
         drawCross(graphics, gap);
         if (GunItem.isScoping(player)) {
             drawScopeCrosshair(graphics, gap);
         }
-        poseStack.popMatrix();
+        poseStack.popPose();
 
         return true;
     }
@@ -147,45 +147,45 @@ public final class CrosshairRenderer {
         updateReloadProgress();
     }
 
-    private static void drawScopeCrosshair(GuiGraphicsExtractor graphics, float gap) {
-        Matrix3x2fStack poseStack = graphics.pose();
-        poseStack.pushMatrix();
-        poseStack.translate(-gap, 0.25f);
-        poseStack.scale(0.5f);
-        poseStack.scale((gap) * 4 + 2, 1f);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, 1, THICKNESS, COLOR);
-        poseStack.popMatrix();
-        poseStack.pushMatrix();
-        poseStack.translate(0.25f, -gap);
-        poseStack.scale(0.5f);
-        poseStack.scale(1f,(gap) * 4 + 2);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, THICKNESS, 1, COLOR);
-        poseStack.popMatrix();
+    private static void drawScopeCrosshair(GuiGraphics graphics, float gap) {
+        PoseStack poseStack = graphics.pose();
+        poseStack.pushPose();
+        poseStack.translate(-gap, 0.25f, 0);
+        poseStack.scale(0.5f, 0.5f, 1);
+        poseStack.scale((gap) * 4 + 2, 1f, 1);
+        graphics.fill(0, 0, 1, THICKNESS, COLOR);
+        poseStack.popPose();
+        poseStack.pushPose();
+        poseStack.translate(0.25f, -gap, 0);
+        poseStack.scale(0.5f, 0.5f, 1);
+        poseStack.scale(1f,(gap) * 4 + 2, 1);
+        graphics.fill(0, 0, THICKNESS, 1, COLOR);
+        poseStack.popPose();
     }
 
-    private static void drawCross(GuiGraphicsExtractor graphics, float gap) {
-        Matrix3x2fStack poseStack = graphics.pose();
+    private static void drawCross(GuiGraphics graphics, float gap) {
+        PoseStack poseStack = graphics.pose();
         int length = LENGTH + (int) (gap / 40);
         // left prong;
-        poseStack.pushMatrix();
-        poseStack.translate(-gap - length, 0);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, length, THICKNESS, COLOR);
-        poseStack.popMatrix();
+        poseStack.pushPose();
+        poseStack.translate(-gap - length, 0, 0);
+        graphics.fill(0, 0, length, THICKNESS, COLOR);
+        poseStack.popPose();
         // right prong
-        poseStack.pushMatrix();
-        poseStack.translate(1 + gap, 0);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, length, THICKNESS, COLOR);
-        poseStack.popMatrix();
+        poseStack.pushPose();
+        poseStack.translate(1 + gap, 0, 0);
+        graphics.fill(0, 0, length, THICKNESS, COLOR);
+        poseStack.popPose();
         // top prong;
-        poseStack.pushMatrix();
-        poseStack.translate(0, -gap - length);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, THICKNESS, length, COLOR);
-        poseStack.popMatrix();
+        poseStack.pushPose();
+        poseStack.translate(0, -gap - length, 0);
+        graphics.fill(0, 0, THICKNESS, length, COLOR);
+        poseStack.popPose();
         // down prong
-        poseStack.pushMatrix();
-        poseStack.translate(0, 1 + gap);
-        graphics.fill(RenderPipelines.GUI_INVERT, 0, 0, THICKNESS, length, COLOR);
-        poseStack.popMatrix();
+        poseStack.pushPose();
+        poseStack.translate(0, 1 + gap, 0);
+        graphics.fill(0, 0, THICKNESS, length, COLOR);
+        poseStack.popPose();
 
     }
 }

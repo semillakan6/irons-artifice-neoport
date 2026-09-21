@@ -11,6 +11,11 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.phys.Vec3;
 
 public class FairyDustParticleOption implements ParticleOptions {
+    private static final StreamCodec<RegistryFriendlyByteBuf, Vec3> VEC3_STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.DOUBLE, Vec3::x,
+            ByteBufCodecs.DOUBLE, Vec3::y,
+            ByteBufCodecs.DOUBLE, Vec3::z,
+            Vec3::new);
     public static MapCodec<FairyDustParticleOption> codec(ParticleType<FairyDustParticleOption> type) {
         return RecordCodecBuilder.mapCodec(builder -> builder.group(
                 Codec.FLOAT.fieldOf("phase").forGetter(o -> o.phase),
@@ -23,7 +28,7 @@ public class FairyDustParticleOption implements ParticleOptions {
         return StreamCodec.composite(
                 ByteBufCodecs.FLOAT, o -> o.phase,
                 ByteBufCodecs.FLOAT, o -> o.radius,
-                Vec3.STREAM_CODEC, o -> o.axis,
+                VEC3_STREAM_CODEC, o -> o.axis,
                 (phase, radius, axis) -> new FairyDustParticleOption(type, phase, radius, axis)
         );
     }

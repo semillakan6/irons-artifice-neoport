@@ -1,4 +1,5 @@
-
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
 license="${mod_license}"
 
 [[mods]] #mandatory
@@ -48,6 +49,6 @@ config="${mod_id}.mixins.json"
     modId="geckolib"
     type="required"
     # This version range declares a minimum of the current minecraft version up to but not including the next major version
-    versionRange="[5.5.2,]"
+    versionRange="[4.8.4,5)"
     ordering="NONE"
     side="BOTH"

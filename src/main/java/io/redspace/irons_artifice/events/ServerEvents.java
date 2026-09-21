@@ -1,11 +1,13 @@
 package io.redspace.irons_artifice.events;
 
-import com.geckolib.animatable.GeoItem;
+import software.bernie.geckolib.animatable.GeoItem;
 import io.redspace.irons_artifice.api.GunAnimations;
+import io.redspace.irons_artifice.api.ComposeShotEvent;
 import io.redspace.irons_artifice.config.ServerConfig;
 import io.redspace.irons_artifice.data.ReloadResult;
 import io.redspace.irons_artifice.entity.Bullet;
 import io.redspace.irons_artifice.entity.DrownedPirateHelper;
+import io.redspace.irons_artifice.entity.IGunslingerMob;
 import io.redspace.irons_artifice.item.FireDelayState;
 import io.redspace.irons_artifice.item.GunItem;
 import io.redspace.irons_artifice.item.GunplayManager;
@@ -13,7 +15,7 @@ import io.redspace.irons_artifice.item.PendingShot;
 import io.redspace.irons_artifice.item.ReloadState;
 import io.redspace.irons_artifice.network.packets.ClientboundEquipSoundPacket;
 import io.redspace.irons_artifice.network.packets.ClientboundGunAnimationPacket;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,6 +29,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -39,6 +42,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 @EventBusSubscriber
 public class ServerEvents {
 
+    @SubscribeEvent
+    public static void modifyMobGunshots(ComposeShotEvent event) {
+        IGunslingerMob.modifyMobGunshots(event);
+    }
 
     @SubscribeEvent
     public static void onDamage(LivingDamageEvent.Post event) {
@@ -58,6 +65,9 @@ public class ServerEvents {
     public static void onEntityTick(EntityTickEvent.Post event) {
         if (!(event.getEntity() instanceof LivingEntity living)) {
             return;
+        }
+        if (!living.level().isClientSide() && living instanceof ServerPlayer player) {
+            tickPlayerBayonetCharge(player);
         }
         // fixme: mainhand only
         ItemStack itemStack = living.getMainHandItem();
@@ -83,11 +93,34 @@ public class ServerEvents {
         }
     }
 
+    private static void tickPlayerBayonetCharge(ServerPlayer player) {
+        if (!GunItem.isChargingBayonet(player) || player.getTicksUsingItem() < 6) {
+            return;
+        }
+
+        Vec3 look = player.getLookAngle();
+        var searchBox = player.getBoundingBox().expandTowards(look.scale(2.5)).inflate(0.75);
+        LivingEntity target = player.level().getEntitiesOfClass(LivingEntity.class, searchBox,
+                        candidate -> candidate != player && candidate.isAlive() && !candidate.isSpectator()
+                                && player.hasLineOfSight(candidate))
+                .stream()
+                .min(java.util.Comparator.comparingDouble(player::distanceToSqr))
+                .orElse(null);
+        if (target == null) {
+            return;
+        }
+
+        if (target.hurt(player.damageSources().playerAttack(player), 8.0F)) {
+            target.knockback(0.75, player.getX() - target.getX(), player.getZ() - target.getZ());
+            player.stopUsingItem();
+        }
+    }
+
     @SubscribeEvent
     public static void onMobEffectApplication(MobEffectEvent.Applicable event) {
         if (event.getEffectSource() instanceof AreaEffectCloud areaEffectCloud &&
                 areaEffectCloud.getOwner() == event.getEntity() &&
-                areaEffectCloud.getPersistentData().getBooleanOr("irons_artifice:venom_cloud", false)) {
+                areaEffectCloud.getPersistentData().getBoolean("irons_artifice:venom_cloud")) {
             event.setResult(MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
         }
     }
@@ -147,9 +180,9 @@ public class ServerEvents {
         ResourceKey<LootTable> lootTableKey = randomizableContainerBlockEntity.getLootTable();
 //        boolean isCursed = level.getServer().reloadableRegistries().lookup().lookupOrThrow(Registries.LOOT_TABLE).get(lootTableKey).map(table -> table.is(IronsArtificeTags.CURSED_BY_PIRATES)).orElse(false);
         // fixme: appears loot table dont have tagging
-        boolean isCursed = lootTableKey.identifier().equals(Identifier.withDefaultNamespace("chests/buried_treasure")) ||
-                lootTableKey.identifier().equals(Identifier.withDefaultNamespace("chests/shipwreck_treasure")) ||
-                lootTableKey.identifier().equals(Identifier.withDefaultNamespace("chests/underwater_ruin_big"));
+        boolean isCursed = lootTableKey.location().equals(ResourceLocation.withDefaultNamespace("chests/buried_treasure")) ||
+                lootTableKey.location().equals(ResourceLocation.withDefaultNamespace("chests/shipwreck_treasure")) ||
+                lootTableKey.location().equals(ResourceLocation.withDefaultNamespace("chests/underwater_ruin_big"));
         if (!isCursed) {
             return;
         }

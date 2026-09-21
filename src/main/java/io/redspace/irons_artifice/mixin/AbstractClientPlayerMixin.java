@@ -11,10 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(AbstractClientPlayer.class)
 public class AbstractClientPlayerMixin {
     @Inject(method = "getFieldOfViewModifier", at = @At("HEAD"), cancellable = true)
-    private void irons_artifice$handleScopingFov(boolean firstPerson, float effectScale, CallbackInfoReturnable<Float> cir) {
-        if (!firstPerson) {
-            return;
-        }
+    private void irons_artifice$handleScopingFov(CallbackInfoReturnable<Float> cir) {
         if (!GunItem.isScoping((AbstractClientPlayer) (Object) this)) {
             return;
         }

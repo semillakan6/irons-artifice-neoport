@@ -7,7 +7,7 @@ import io.redspace.irons_artifice.item.FireDelayState;
 import io.redspace.irons_artifice.item.GunItem;
 import io.redspace.irons_artifice.item.GunplayManager;
 import io.redspace.irons_artifice.item.ReloadState;
-import net.minecraft.core.component.DataComponents;
+import io.redspace.irons_artifice.registry.DataComponentRegistry;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
@@ -270,7 +270,7 @@ public class RangedGunAttackGoal<T extends Mob> extends Goal {
     protected boolean canStartBayonetCharge(ItemStack gun, double distSqr) {
         return bayonetCooldown <= 0
                 && distSqr < bands.bayonetSqr()
-                && gun.has(DataComponents.KINETIC_WEAPON);
+                && gun.has(DataComponentRegistry.BAYONET);
     }
 
     protected boolean shouldEndBayonetCharge(double distSqr) {
@@ -284,7 +284,12 @@ public class RangedGunAttackGoal<T extends Mob> extends Goal {
         if (distSqr > chaseRange * chaseRange) {
             return true;
         }
-        return mob.stabbedEntities(e -> e == target) > 0;
+        if (distSqr < 4.0) {
+            target.hurt(mob.damageSources().mobAttack(mob), 8.0F);
+            target.knockback(0.75, mob.getX() - target.getX(), mob.getZ() - target.getZ());
+            return true;
+        }
+        return false;
     }
 
     protected void endVolley() {

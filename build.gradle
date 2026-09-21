@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.141'
+    id 'net.neoforged.moddev' version '2.0.147'
     id 'idea'
     id 'me.modmuss50.mod-publish-plugin' version '2.1.1'
 }
@@ -28,7 +28,7 @@ repositories {
                 url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
             }
         }
-        filter { includeGroupAndSubgroups('com.geckolib') }
+        filter { includeGroupAndSubgroups('software.bernie.geckolib') }
     }
     maven {
         url "https://cursemaven.com"
@@ -45,7 +45,18 @@ base {
     archivesName = mod_id
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// The repository ships its generated resources. The 26.x-only generator implementations are
+// intentionally kept as porting references, but are not part of the 1.21.1 runtime artifact.
+sourceSets.main.java.exclude(
+        'io/redspace/irons_artifice/datagen/DataGenerators.java',
+        'io/redspace/irons_artifice/datagen/ItemModelDataGenerator.java',
+        'io/redspace/irons_artifice/datagen/RecipeDataGenerator.java',
+        'io/redspace/irons_artifice/datagen/AdvancementDataGenerator.java',
+        'io/redspace/irons_artifice/datagen/ArtificeAdvancements.java',
+        'io/redspace/irons_artifice/datagen/LootTableDataGenerator.java'
+)
 
 java {
     withSourcesJar()
@@ -100,9 +111,9 @@ configurations {
 }
 
 dependencies {
-    implementation "com.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
+    compileOnly "org.jspecify:jspecify:1.0.0"
+    implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
 //    implementation "io.redspace:irons_lib:${irons_lib_version}"
-    runtimeOnly "curse.maven:jei-238222:8548511"
 
 //    implementation "curse.maven:ftb-teams-forge-404468:8074003"
 //    implementation "curse.maven:ftb-library-forge-404465:8574542"
@@ -114,6 +125,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
             neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,

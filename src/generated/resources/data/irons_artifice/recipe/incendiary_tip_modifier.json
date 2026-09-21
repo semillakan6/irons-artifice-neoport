@@ -1,17 +1,23 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "B": "irons_artifice:blackpowder",
-    "I": "#c:ingots/iron",
-    "P": "minecraft:blaze_powder"
-  },
-  "pattern": [
-    " P ",
-    "PIP",
-    "IBI"
-  ],
-  "result": {
-    "id": "irons_artifice:incendiary_tip_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "B":  {
+                          "item":  "irons_artifice:blackpowder"
+                      },
+                "I":  {
+                          "tag":  "c:ingots/iron"
+                      },
+                "P":  {
+                          "item":  "minecraft:blaze_powder"
+                      }
+            },
+    "pattern":  [
+                    " P ",
+                    "PIP",
+                    "IBI"
+                ],
+    "result":  {
+                   "id":  "irons_artifice:incendiary_tip_modifier"
+               }
 }

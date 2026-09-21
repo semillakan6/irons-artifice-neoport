@@ -18,7 +18,7 @@ public final class DamageSources {
 
     public static RandomizableDamageSource bullet(RegistryAccess registryAccess, Entity bullet, @Nullable Entity owner) {
         return new RandomizableDamageSource(
-                registryAccess.getOrThrow(BULLET_DAMAGE_TYPE),
+                registryAccess.registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(BULLET_DAMAGE_TYPE),
                 bullet,
                 owner
         ).setDeathMessages(

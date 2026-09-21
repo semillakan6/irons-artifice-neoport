@@ -1,17 +1,23 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "#": "minecraft:amethyst_shard",
-    "*": "minecraft:ender_eye",
-    "B": "irons_artifice:blackpowder"
-  },
-  "pattern": [
-    " #B",
-    "#*#",
-    "B# "
-  ],
-  "result": {
-    "id": "irons_artifice:singularity_charge_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "#":  {
+                          "item":  "minecraft:amethyst_shard"
+                      },
+                "*":  {
+                          "item":  "minecraft:ender_eye"
+                      },
+                "B":  {
+                          "item":  "irons_artifice:blackpowder"
+                      }
+            },
+    "pattern":  [
+                    " #B",
+                    "#*#",
+                    "B# "
+                ],
+    "result":  {
+                   "id":  "irons_artifice:singularity_charge_modifier"
+               }
 }

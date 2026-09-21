@@ -1,16 +1,20 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "#": "minecraft:iron_chain",
-    "B": "irons_artifice:bullet"
-  },
-  "pattern": [
-    "###",
-    "# #",
-    "B B"
-  ],
-  "result": {
-    "id": "irons_artifice:chain_shot_modifier"
-  }
+    "type":  "minecraft:crafting_shaped",
+    "category":  "misc",
+    "key":  {
+                "#":  {
+                          "item":  "minecraft:chain"
+                      },
+                "B":  {
+                          "item":  "irons_artifice:bullet"
+                      }
+            },
+    "pattern":  [
+                    "###",
+                    "# #",
+                    "B B"
+                ],
+    "result":  {
+                   "id":  "irons_artifice:chain_shot_modifier"
+               }
 }

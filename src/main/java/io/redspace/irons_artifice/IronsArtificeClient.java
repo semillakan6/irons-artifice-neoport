@@ -2,11 +2,10 @@ package io.redspace.irons_artifice;
 
 import io.redspace.irons_artifice.client.ClientHelper;
 import io.redspace.irons_artifice.client.Keybinds;
+import io.redspace.irons_artifice.client.armor.GenericArmorModel;
 import io.redspace.irons_artifice.client.entity.ChainEntityRenderer;
 import io.redspace.irons_artifice.client.entity.GunslingerRenderer;
 import io.redspace.irons_artifice.client.entity.illificer.IllificerRenderer;
-import io.redspace.irons_artifice.client.gui.GunPreviewRenderState;
-import io.redspace.irons_artifice.client.gui.GunPreviewRenderer;
 import io.redspace.irons_artifice.client.gun.AttachmentGeoRenderer;
 import io.redspace.irons_artifice.client.gun.AttachmentRenderableRegistry;
 import io.redspace.irons_artifice.client.gun.GunInHandRenderer;
@@ -25,18 +24,22 @@ import io.redspace.irons_artifice.client.gun.GunArmPoses;
 import io.redspace.irons_artifice.client.particle.TintedExplosionParticle;
 import io.redspace.irons_artifice.gun.ArmPoseKind;
 import io.redspace.irons_artifice.item.GunItem;
+import io.redspace.irons_artifice.item.BaseGeoArmorItem;
+import io.redspace.irons_artifice.item.CowboyHatItem;
+import io.redspace.irons_artifice.item.TricorneItem;
 import io.redspace.irons_artifice.menu.GunModifierScreen;
 import io.redspace.irons_artifice.registry.EntityRegistry;
 import io.redspace.irons_artifice.registry.MenuRegistry;
 import io.redspace.irons_artifice.registry.ParticleRegistry;
-import com.geckolib.animatable.client.GeoRenderProvider;
-import com.geckolib.model.DefaultedItemGeoModel;
-import com.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.animatable.client.GeoRenderProvider;
+import software.bernie.geckolib.model.DefaultedItemGeoModel;
+import software.bernie.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.renderer.GeoArmorRenderer;
 import com.google.common.base.Suppliers;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.NoopRenderer;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
@@ -53,7 +56,6 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
-import net.neoforged.neoforge.client.event.RegisterPictureInPictureRenderersEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -79,14 +81,9 @@ public class IronsArtificeClient {
     }
 
     @SubscribeEvent
-    public static void registerPictureInPictureRenderers(RegisterPictureInPictureRenderersEvent event) {
-        event.register(GunPreviewRenderState.class, GunPreviewRenderer::new);
-    }
-
-    @SubscribeEvent
     public static void registerRenderers(final EntityRenderersEvent.RegisterRenderers event) {
         for (GunItem gun : guns()) {
-            Identifier modelId = BuiltInRegistries.ITEM.getKey(gun);
+            ResourceLocation modelId = BuiltInRegistries.ITEM.getKey(gun);
             gun.geoRenderProvider.setValue(new GeoRenderProvider() {
                 private final Supplier<GeoItemRenderer<GunItem>> renderer =
                         Suppliers.memoize(() -> new GunInHandRenderer(new DefaultedItemGeoModel<>(modelId)));
@@ -96,6 +93,13 @@ public class IronsArtificeClient {
                     return this.renderer.get();
                 }
             });
+        }
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item instanceof CowboyHatItem hat) {
+                registerArmorRenderer(hat, "cowboy_hat");
+            } else if (item instanceof TricorneItem hat) {
+                registerArmorRenderer(hat, "tricorne");
+            }
         }
         AttachmentRenderableRegistry.register(
                 IronsArtifice.id("spyglass_scope"),
@@ -118,6 +122,19 @@ public class IronsArtificeClient {
                         "model/suppressor",
                         "empty"))
         );
+    }
+
+    private static void registerArmorRenderer(BaseGeoArmorItem armor, String modelName) {
+        armor.geoRenderProvider.setValue(new GeoRenderProvider() {
+            private final Supplier<GeoArmorRenderer<?>> renderer =
+                    Suppliers.memoize(() -> new GeoArmorRenderer<>(new GenericArmorModel<>(modelName)));
+
+            @Override
+            public <T extends LivingEntity> GeoArmorRenderer<?> getGeoArmorRenderer(T entity, ItemStack stack,
+                    net.minecraft.world.entity.EquipmentSlot slot, HumanoidModel<T> original) {
+                return renderer.get();
+            }
+        });
     }
 
     @SubscribeEvent

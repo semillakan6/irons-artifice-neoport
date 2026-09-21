@@ -10,7 +10,7 @@ import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.data.recipes.ShapelessRecipeBuilder;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
@@ -472,10 +472,10 @@ public class RecipeDataGenerator extends RecipeProvider {
     }
 
     private static TagKey<Item> commonTag(String path) {
-        return TagKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath("c", path));
+        return TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", path));
     }
 
-    private static ResourceKey<Recipe<?>> recipeId(Identifier identifier) {
+    private static ResourceKey<Recipe<?>> recipeId(ResourceLocation identifier) {
         return ResourceKey.create(Registries.RECIPE, identifier);
     }
 

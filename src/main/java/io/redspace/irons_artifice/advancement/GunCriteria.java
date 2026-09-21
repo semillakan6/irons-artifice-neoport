@@ -7,6 +7,7 @@ import io.redspace.irons_artifice.entity.Bullet;
 import io.redspace.irons_artifice.item.GunItem;
 import io.redspace.irons_artifice.registry.CriterionRegistry;
 import io.redspace.irons_artifice.registry.DataAttachmentRegistry;
+import io.redspace.irons_artifice.registry.DataComponentRegistry;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -71,12 +72,12 @@ public final class GunCriteria {
                 killed = true;
                 totalKills = state.recordKill(record.fireId(), victim.getUUID());
             }
-            float damage = state.recordDamage(record.fireId(), event.getInflictedDamage());
+            float damage = state.recordDamage(record.fireId(), event.getNewDamage());
             player.setData(DataAttachmentRegistry.SHOT_COMBAT, state);
             triggerCombat(player, killed, damage, player.distanceTo(victim), pellets, totalKills, record, bullet.getProfile().itemStack(), victim, GunCombatSource.BULLET);
-        } else if (player.getWeaponItem().getItem() instanceof GunItem && player.getWeaponItem().has(DataComponents.KINETIC_WEAPON)) {
+        } else if (player.getWeaponItem().getItem() instanceof GunItem && player.getWeaponItem().has(DataComponentRegistry.BAYONET)) {
             boolean killed = victim.getHealth() <= 0;
-            triggerCombat(player, killed, event.getInflictedDamage(), player.distanceTo(victim), 0, killed ? 1 : 0, null, player.getWeaponItem(), victim, GunCombatSource.BAYONET);
+            triggerCombat(player, killed, event.getNewDamage(), player.distanceTo(victim), 0, killed ? 1 : 0, null, player.getWeaponItem(), victim, GunCombatSource.BAYONET);
         }
 
     }
